@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Question Map — My First Memory</title>
+<title>My First Memory</title>
 <style>
   :root {
     --paper:      #EDE7DA;
@@ -554,7 +554,7 @@
       <span class="export-title">Group</span>
     </button>
     <div class="fold newgroup" id="groupBody" hidden>
-      <input type="text" id="newGroupName" class="pill" placeholder="Name a new group, press Enter" aria-label="New group name">
+      <input type="text" id="newGroupName" class="pill" placeholder="Add a group" aria-label="New group name">
       <button class="pill" id="addGroup">Add group</button>
     </div>
   </section>
@@ -788,27 +788,33 @@ async function save() {
 
 function seed() {
   groups = [
-    { id: uid(), name: "Past", color: PALETTE_LIGHT[0], questions: [
-      { id: uid(), text: "What's the first memory you have of making something with your own hands?", labels: ["origin", "childhood"] },
-      { id: uid(), text: "Who was the first person who took your ambition seriously?", labels: ["origin", "people"] },
-      { id: uid(), text: "What did your parents believe about work, and did you keep it?", labels: ["origin", "family"] },
-      { id: uid(), text: "When did you first realise you'd rather build than be employed?", labels: ["turning-point", "identity"] },
-      { id: uid(), text: "What's the earliest risk you took that your friends thought was foolish?", labels: ["turning-point", "risk"] },
-      { id: uid(), text: "Which failure from those years still shapes how you decide things?", labels: ["hard-times", "reflection"] },
-      { id: uid(), text: "Was there a moment you nearly gave up and didn't?", labels: ["hard-times", "turning-point"] },
-      { id: uid(), text: "What did you believe about success at twenty that you'd argue with now?", labels: ["reflection", "identity"] }
+    { id: uid(), name: "Vergangenheit", color: PALETTE_LIGHT[0], questions: [
+      { id: uid(), text: "Was ist deine erste Erinnerung?", labels: ["kindheit", "prägung", "ursprung"] },
+      { id: uid(), text: "Wenn du an zu Hause zurück denkst, welches Bild siehst du da in deinem Kopf?", labels: ["kindheit", "orte", "ursprung", "zu-hause"] },
+      { id: uid(), text: "Weißt du, wie sich deine Eltern kennengelernt haben?", labels: ["familie", "ursprung"] },
+      { id: uid(), text: "Wie hast du die Feiertage als Kind verbracht?", labels: ["familie", "kindheit", "prägung", "ursprung"] },
+      { id: uid(), text: "Was glaubst du, haben deine Eltern richtig gemacht?", labels: ["familie", "glück", "prägung", "ursprung"] },
+      { id: uid(), text: "Welche Spiele hast du als Kind gespielt?", labels: ["familie", "freunde", "kindheit"] },
+      { id: uid(), text: "Womit haben sich deine Freunde beschäftigt?", labels: ["freunde", "kindheit"] },
+      { id: uid(), text: "Wer war dein bester Freund?", labels: ["freunde", "kindheit"] },
+      { id: uid(), text: "Welcher Sommer war der schönste für dich?", labels: ["freunde", "glück", "kindheit"] },
+      { id: uid(), text: "Erinnerst du dich an ein gebrochenes Herz?", labels: ["liebe", "prägung", "traurigkeit", "wendepunkt"] }
     ]},
-    { id: uid(), name: "Present", color: PALETTE_LIGHT[3], questions: [
-      { id: uid(), text: "What does an ordinary Tuesday actually look like for you?", labels: ["craft", "routine"] },
-      { id: uid(), text: "What part of the work would you happily never do again?", labels: ["craft"] },
-      { id: uid(), text: "What still frightens you about running this?", labels: ["hard-times", "risk"] },
-      { id: uid(), text: "Who do you call when a decision is genuinely hard?", labels: ["people", "craft"] },
-      { id: uid(), text: "What are you currently pretending to have figured out?", labels: ["reflection", "identity"] }
+    { id: uid(), name: "Gegenwart", color: PALETTE_LIGHT[3], questions: [
+      { id: uid(), text: "Was verstehen die Leute an dir oft falsch?", labels: ["charakter", "konflikt"] },
+      { id: uid(), text: "Gibt es etwas aus der Vergangenheit, das dich immer noch beschäftigt?", labels: ["charakter", "konflikt", "traurigkeit"] },
+      { id: uid(), text: "Gibt es einen guten Freund, den du im Laufe der Zeit verloren hast?", labels: ["freunde", "traurigkeit"] },
+      { id: uid(), text: "Erinnerst du dich an einen Lieblingsort, den es nicht mehr gibt?", labels: ["glück", "orte", "traurigkeit"] },
+      { id: uid(), text: "Gibt es jemanden, von dem du dir wünschen würdest, angerufen zu werden?", labels: ["charakter", "freunde", "traurigkeit"] },
+      { id: uid(), text: "Mit wem sprichst du, wenn du vor einem extrem schwierigen Problem stehst?", labels: ["alltag", "ambition", "freunde", "konflikt"] },
+      { id: uid(), text: "Was bringt dich zum Lächeln?", labels: ["alltag", "charakter", "glück"] }
     ]},
-    { id: uid(), name: "Future", color: PALETTE_LIGHT[4], questions: [
-      { id: uid(), text: "What are you building toward that you haven't said out loud yet?", labels: ["ambition"] },
-      { id: uid(), text: "What would have to be true in five years for this to feel worth it?", labels: ["ambition", "reflection"] },
-      { id: uid(), text: "What do you want to be remembered for by the people who worked with you?", labels: ["reflection", "identity", "people"] }
+    { id: uid(), name: "Zukunft", color: PALETTE_LIGHT[4], questions: [
+      { id: uid(), text: "Was ist etwas Verrücktes, dass du nie im Leben tun würdest?", labels: ["risiko"] },
+      { id: uid(), text: "Was ist das Schlimmste, dass dir jemals passieren könnte?", labels: ["konflikt", "traurigkeit"] },
+      { id: uid(), text: "Was brauchen junge Menschen, um in dieser Welt zu bestehen?", labels: ["ambition", "charakter", "prägung"] },
+      { id: uid(), text: "Was tust du an deinem letzten Tag auf dieser Erde?", labels: ["ambition"] },
+      { id: uid(), text: "Wie möchtest du, dass man sich an dich erinnert?", labels: ["ambition"] }
     ]}
   ];
 }
