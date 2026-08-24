@@ -204,7 +204,7 @@
   /* Dim the row's content, not the row itself — a parent opacity would
      also fade the label-suggestion dropdown, which must stay solid. */
   .q.asked > .bar,
-  .q.asked > .text { opacity: 0.5; }
+  .q.asked > .q-body { opacity: 0.5; }
   .q.asked .text:not(.text-edit) { text-decoration: line-through; text-decoration-color: var(--muted); }
   .q.asked > .bar { opacity: 0.4; }
   /* Chips dim, but the entry input + dropdown stay fully opaque. */
@@ -230,7 +230,25 @@
   #uncheckAllBtn.armed, #resetBtn.armed { color: var(--signal); border-color: var(--signal); }
   .import-btn:disabled { opacity: 0.4; cursor: default; }
   .import-btn:disabled:hover { color: var(--muted); border-color: var(--ink-soft); }
+  .q-body { min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; }
   .q .text { font-size: 1.06rem; line-height: 1.4; padding-top: 0.05rem; cursor: text; }
+
+  /* Follow-up notes captured during the interview, hanging under the question. */
+  .notes { list-style: none; margin: 0; padding: 0 0 0 0.9rem; display: flex; flex-direction: column; gap: 0.2rem; }
+  .notes .note {
+    position: relative; cursor: pointer; user-select: none;
+    font-family: var(--mono); font-size: 0.76rem; line-height: 1.45;
+    color: var(--ink); padding-left: 0.9rem;
+    transition: color 0.18s ease, opacity 0.18s ease;
+  }
+  .notes .note::before {
+    content: ""; position: absolute; left: 0; top: 0.5em;
+    width: 0.35rem; height: 0.35rem; border-radius: 50%;
+    background: var(--gc); opacity: 0.7;
+  }
+  .notes .note:hover { color: var(--thread); }
+  .notes .note.done { text-decoration: line-through; text-decoration-color: var(--ink-soft); color: var(--muted); opacity: 0.65; }
+  .notes .note.done::before { background: var(--ink-soft); }
   .q .text:hover { text-decoration: underline; text-decoration-color: var(--ink-soft); text-underline-offset: 3px; }
   .q .text-edit {
     font-family: inherit; font-size: 1.06rem; line-height: 1.4;
@@ -718,8 +736,13 @@ async function load() {
     groups = [];
   }
   if (!Array.isArray(groups) || !groups.length) seed();
-  // Ensure every question has a boolean asked flag (older saves lack it).
-  groups.forEach(g => g.questions.forEach(q => { q.asked = !!q.asked; }));
+  // Older saves predate the asked flag and follow-up notes — normalise both.
+  groups.forEach(g => g.questions.forEach(q => {
+    q.asked = !!q.asked;
+    q.notes = Array.isArray(q.notes)
+      ? q.notes.filter(n => n && n.text).map(n => ({ id: n.id || uid(), text: n.text, done: !!n.done }))
+      : [];
+  }));
   render();
 }
 
@@ -879,16 +902,57 @@ function addQuestion(gid, text) {
   const t = text.trim();
   if (!t) return false;
   const g = groups.find(g => g.id === gid);
-  if (g) g.questions.push({ id: uid(), text: t, labels: [] });
+  if (g) g.questions.push({ id: uid(), text: t, labels: [], notes: [] });
   save(); render();
   return true;
 }
 
-function editQuestion(gid, qid, text) {
-  const t = text.trim();
+/* ---------- question + notes text format ----------
+   A question is edited as one block of text:
+     line 1        the question itself
+     lines 2..n    "- " bullets, each a follow-up note
+   A checked-off note carries an "[x] " marker so its state survives editing. */
+
+function questionToText(q) {
+  const lines = [q.text];
+  (q.notes || []).forEach(n => lines.push("- " + (n.done ? "[x] " : "") + n.text));
+  return lines.join("\n");
+}
+
+function parseQuestionText(raw) {
+  const lines = String(raw).split("\n");
+  const text = (lines.shift() || "").trim();
+  const notes = [];
+  lines.forEach(line => {
+    let s = line.trim();
+    if (!s) return;
+    s = s.replace(/^[-*+]\s*/, "");          // strip the bullet marker
+    let done = false;
+    const box = s.match(/^\[([ xX])\]\s*/);  // optional done marker
+    if (box) { done = box[1].toLowerCase() === "x"; s = s.slice(box[0].length); }
+    s = s.trim();
+    if (s) notes.push({ id: uid(), text: s, done });
+  });
+  return { text, notes };
+}
+
+function editQuestion(gid, qid, raw) {
   const g = groups.find(g => g.id === gid);
   const q = g && g.questions.find(q => q.id === qid);
-  if (q && t && t !== q.text) { q.text = t; save(); }
+  if (!q) return;
+  const { text, notes } = parseQuestionText(raw);
+  if (!text) return;                          // never blank out a question
+  q.text = text;
+  q.notes = notes;
+  save();
+}
+
+/* Toggle a single follow-up note struck through / not. */
+function toggleNote(gid, qid, nid) {
+  const g = groups.find(g => g.id === gid);
+  const q = g && g.questions.find(q => q.id === qid);
+  const n = q && (q.notes || []).find(n => n.id === nid);
+  if (n) { n.done = !n.done; save(); render(); }
 }
 
 function removeQuestion(gid, qid) {
@@ -1294,18 +1358,22 @@ function renderQuestion(g, q) {
     toggleAsked(g.id, q.id);
   });
 
+  /* Column 2 holds the question and, beneath it, any follow-up notes. */
+  const body = document.createElement("div");
+  body.className = "q-body";
+
   const text = document.createElement("span");
   text.className = "text";
   text.textContent = q.text;
-  text.title = "Click to edit";
+  text.title = "Click to edit \u00B7 Shift+Enter adds a note";
   text.addEventListener("click", e => {
     e.stopPropagation();
-    // Swap the text for a textarea sized to the content; save on Enter/blur.
+    // Edit the question and its notes as one block of text.
     const ta = document.createElement("textarea");
     ta.className = "text text-edit";
-    ta.value = q.text;
+    ta.value = questionToText(q);
     ta.rows = 1;
-    text.replaceWith(ta);
+    body.replaceWith(ta);
     const autosize = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -1320,12 +1388,40 @@ function renderQuestion(g, q) {
       render();
     };
     ta.addEventListener("keydown", ev => {
-      // Enter saves; Shift+Enter inserts a newline for multi-line wording.
-      if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
+      // Shift+Enter opens a new bullet line — the "- " is inserted for you,
+      // so during an interview you just type the note and keep going.
+      if (ev.key === "Enter" && ev.shiftKey) {
+        ev.preventDefault();
+        const at = ta.selectionStart;
+        const insert = "\n- ";
+        ta.value = ta.value.slice(0, at) + insert + ta.value.slice(ta.selectionEnd);
+        const caret = at + insert.length;
+        ta.setSelectionRange(caret, caret);
+        autosize();
+        return;
+      }
+      // Plain Enter saves the question together with its notes.
+      if (ev.key === "Enter") { ev.preventDefault(); commit(); }
       if (ev.key === "Escape") { ev.stopPropagation(); committed = true; render(); }
     });
     ta.addEventListener("blur", commit);
   });
+
+  body.appendChild(text);
+
+  if ((q.notes || []).length) {
+    const ul = document.createElement("ul");
+    ul.className = "notes";
+    q.notes.forEach(n => {
+      const li = document.createElement("li");
+      li.className = "note" + (n.done ? " done" : "");
+      li.textContent = n.text;
+      li.title = n.done ? "Mark as still open" : "Strike off";
+      li.addEventListener("click", e => { e.stopPropagation(); toggleNote(g.id, q.id, n.id); });
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+  }
 
   const labels = document.createElement("div");
   labels.className = "labels";
@@ -1515,7 +1611,7 @@ function renderQuestion(g, q) {
     labels.appendChild(kill);
   }
 
-  li.append(bar, text, labels);
+  li.append(bar, body, labels);
   return li;
 }
 
@@ -1572,7 +1668,12 @@ function buildExport() {
       const sorted = [...q.labels].sort((a, b) => a.localeCompare(b));
       const tags = sorted.length ? " (" + sorted.join(", ") + ")" : "";
       const mark = q.asked ? "[x] " : "";
-      return "- " + mark + q.text + tags;
+      let out = "- " + mark + q.text + tags;
+      // Notes ride along as indented sub-bullets so a round trip keeps them.
+      (q.notes || []).forEach(n => {
+        out += "\n  - " + (n.done ? "[x] " : "") + n.text;
+      });
+      return out;
     });
     return g.name + "\n" + (lines.length ? lines.join("\n") : "- (no questions yet)");
   }).join("\n\n");
@@ -1594,6 +1695,20 @@ function parseImport(text) {
   text.split(/\r?\n/).forEach(raw => {
     const line = raw.trim();
     if (!line) return;
+
+    // An indented bullet is a follow-up note on the question above it.
+    const indented = /^\s+[-*+]\s+/.test(raw);
+    if (indented && current && current.questions.length) {
+      let nb = line.replace(/^[-*+]\s+/, "").trim();
+      let ndone = false;
+      const nbox = nb.match(/^\[([ xX]?)\]\s*(.*)$/);
+      if (nbox) { ndone = nbox[1].toLowerCase() === "x"; nb = nbox[2].trim(); }
+      if (nb) {
+        const host = current.questions[current.questions.length - 1];
+        (host.notes = host.notes || []).push({ id: uid(), text: nb, done: ndone });
+      }
+      return;
+    }
 
     if (/^[-*]\s+/.test(line)) {
       let body = line.replace(/^[-*]\s+/, "").trim();
@@ -1617,7 +1732,7 @@ function parseImport(text) {
         current = { id: uid(), name: "Ungrouped", color: PALETTE[0], questions: [] };
         out.push(current);
       }
-      current.questions.push({ id: uid(), text: body, labels, asked });
+      current.questions.push({ id: uid(), text: body, labels, asked, notes: [] });
     } else {
       current = {
         id: uid(),
