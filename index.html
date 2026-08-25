@@ -98,7 +98,10 @@
     display: grid;
     grid-template-columns: 0.75rem minmax(0, 1fr);
     gap: 0.9rem; align-items: center;
-    margin-bottom: 0.2rem;
+    /* Matches a question row's top padding, so the first insertion + sits
+       exactly midway between the header bar and the first question's bar —
+       the same spacing every other insertion point gets. */
+    margin-bottom: 0.75rem;
     position: relative;
   }
   .group-bar-head {
@@ -174,10 +177,7 @@
   }
   /* Separator is a straight line drawn above each row (except the first),
      as a pseudo-element so it never picks up the row's corner radius. */
-  .q + .q::before {
-    content: ""; position: absolute; top: 0; left: 0; right: 0;
-    border-top: 1px solid var(--ink-soft);
-  }
+  /* Separators are drawn by the insertion rows that sit between questions. */
 
   .bar {
     align-self: stretch; min-height: 1.5rem;
@@ -349,19 +349,43 @@
   /* While armed, the bar signals it's grabbable. */
   .bar { touch-action: none; }
 
-  /* ---- per-group add bar ---- */
-  /* toggle that reveals the add-question row, sits in the colour-bar column */
-  .add-toggle {
+  /* ---- insertion points ---- */
+  /* An insertion point sits on each separator between questions. Closed, it's
+     just the hairline with a + that fades in on hover; open, it expands into
+     the input row. The tail one appends to the group. */
+  .insert-row {
+    list-style: none; position: relative;
     display: flex; align-items: center; gap: 0.9rem;
-    padding: 0; margin: 0.5rem 0 0.1rem 0;
-    border-top: 1px solid var(--ink-soft);
-    /* Fixed height, contents centred — collapsed + and open input row are
-       always identical, so toggling never shifts the page. */
-    height: 2.6rem;
+    height: 0.9rem; margin: 0;
   }
-  /* When open, the input takes the remaining width and the button sits at
-     the end — all on the toggle's single row. */
-  .add-toggle.open .q-input { flex: 1 1 auto; }
+  /* The separator itself. On hover it retracts to leave a small gap where
+     the + sits, so the glyph reads as breaking the line rather than
+     sitting on a patch of background. */
+  .insert-row::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    border-top: 1px solid var(--ink-soft);
+    transition: left 0.15s ease;
+  }
+  .insert-row:hover::before,
+  .insert-row:focus-within::before { left: 1.1rem; }
+  .insert-row.no-rule::before { border-top-color: transparent; }
+  /* The + hides until the separator is hovered, keeping the list quiet.
+     Its horizontal bar sits on the separator's own line. */
+  .insert-row .plus-btn {
+    opacity: 0; z-index: 2;
+    transition: opacity 0.15s ease;
+  }
+  .insert-row:hover .plus-btn,
+  .insert-row .plus-btn:focus-visible,
+  .insert-row.open .plus-btn { opacity: 1; }
+  /* Open: fixed height so expanding never shifts what's below by a stray pixel. */
+  .insert-row.open { height: 2.6rem; }
+  .insert-row.open::before { border-top-color: transparent; }
+  .insert-row.open .q-input { flex: 1 1 auto; }
+  /* An empty group's row is permanently open — the + would have nothing to
+     toggle, so it holds its space without showing or taking clicks. */
+  .plus-btn.spacer { visibility: hidden; pointer-events: none; }
+
   .plus-btn {
     width: 0.75rem; height: 0.9rem; padding: 0; flex: 0 0 auto;
     background: none; border: none; cursor: pointer;
@@ -371,7 +395,6 @@
   /* Invisible padded hit area — the glyph stays small, the tap target
      stays finger-sized on touch devices. */
   .plus-btn::before, .plus-btn::after { pointer-events: none; }
-  .add-toggle .plus-btn { margin: 0.25rem 0; }
   /* The + is drawn from two equal bars, centred — its size is set here,
      not by the button box, so the column width can't distort it. */
   .plus-btn::before, .plus-btn::after {
@@ -391,22 +414,6 @@
   .plus-btn:hover::before, .plus-btn:hover::after { opacity: 0.65; }
   .plus-btn.open::after { transform: translate(-50%, -50%) rotate(90deg); opacity: 0; }
   .plus-btn:focus-visible { outline: 2px solid var(--thread); outline-offset: 3px; }
-
-  .add-toggle .plus-label {
-    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.05em;
-    color: var(--muted); cursor: pointer; user-select: none;
-    opacity: 0; transition: opacity 0.18s ease;
-    pointer-events: none;              /* invisible text isn't a hover target */
-    margin-left: -0.55rem;             /* sit close to the +, so hover doesn't drop */
-    padding-left: 0.55rem;             /* keeps the visual offset unchanged */
-  }
-  /* Only the + itself reveals the caption — not the surrounding row.
-     Once shown, the caption stays interactive so it can be clicked. */
-  .plus-btn:hover + .plus-label,
-  .plus-btn:focus-visible + .plus-label,
-  .plus-label:hover {
-    opacity: 1; pointer-events: auto;
-  }
 
   .q-input {
     background: #FFFDF8; border: 1px dashed var(--ink-soft); color: var(--ink);
@@ -540,8 +547,13 @@
     .q { grid-template-columns: 0.75rem minmax(0,1fr); }
     .q .labels { grid-column: 2; }
     /* Add row wraps on narrow screens: input takes the line, button below. */
-    .add-toggle { flex-wrap: wrap; }
-    .add-toggle.open .q-input { flex: 1 1 100%; }
+    .insert-row { flex-wrap: wrap; }
+    .insert-row.open { height: auto; padding: 0.4rem 0; }
+    .insert-row.open .q-input { flex: 1 1 100%; }
+    /* No hover on touch — keep every insertion + reachable, and hold the
+       separator retracted since the glyph is always showing. */
+    .insert-row .plus-btn { opacity: 1; }
+    .insert-row::before { left: 1.1rem; }
     /* Name and delete share one line; header is two columns now. */
     .group-head { gap: 0.55rem; }
     /* No hover on touch — keep delete visible, and let the wider confirm
@@ -644,7 +656,7 @@ const PALETTE = [...PALETTE_DARK, ...PALETTE_LIGHT];
 let groups = [];
 let activeLabel = null;
 let openPicker = null;     // group id whose colour popover is open
-let openAdder = null;      // group id whose add-question field is showing
+let openAdder = null;      // { gid, before } — which insertion point is open
 let showAsked = false;     // reveal already-asked questions in the live view
 let pendingDelete = null;  // group id awaiting delete confirmation
 let pendingDeleteQ = null; // question id awaiting delete confirmation
@@ -874,9 +886,13 @@ function addGroup() {
   const name = newGroupEl.value.trim();
   if (!name) { newGroupEl.focus(); return; }
   const color = PALETTE_DARK[groups.length % PALETTE_DARK.length];
-  groups.push({ id: uid(), name, color, questions: [] });
+  const g = { id: uid(), name, color, questions: [] };
+  groups.push(g);
   newGroupEl.value = "";
   save(); render();
+  // The new group's input is already open — put the cursor straight in it.
+  const fresh = document.querySelector('[data-addfor="' + g.id + '|end"]');
+  if (fresh) fresh.focus();
 }
 
 function removeGroup(gid) {
@@ -898,11 +914,16 @@ function setColor(gid, color) {
 }
 
 /* ---------- question actions ---------- */
-function addQuestion(gid, text) {
+function addQuestion(gid, text, beforeQid) {
   const t = text.trim();
   if (!t) return false;
   const g = groups.find(g => g.id === gid);
-  if (g) g.questions.push({ id: uid(), text: t, labels: [], notes: [] });
+  if (!g) return false;
+  const q = { id: uid(), text: t, labels: [], notes: [] };
+  // beforeQid places the new question directly above that one; without it
+  // (or if it's gone) the question lands at the end of the group.
+  const idx = beforeQid ? g.questions.findIndex(x => x.id === beforeQid) : -1;
+  if (idx === -1) g.questions.push(q); else g.questions.splice(idx, 0, q);
   save(); render();
   return true;
 }
@@ -1225,56 +1246,78 @@ function renderGroup(g) {
   if (activeLabel) visible = visible.filter(q => q.labels.includes(activeLabel));
   const askedCount = g.questions.filter(q => q.asked).length;
 
-  if (!g.questions.length) {
-    const none = document.createElement("div");
-    none.className = "empty-group";
-    none.textContent = "no questions in this group yet";
-    sec.appendChild(none);
-  } else if (activeLabel && !visible.length) {
-    // Group has questions, but none match the active filter — skip it
-    // entirely so filtered results aren't padded with empty groups.
-    return null;
-  } else if (!visible.length) {
+  // An empty group has nothing to show and only one useful next step, so its
+  // input opens straight away rather than hiding behind a hover target.
+  const isEmpty = !g.questions.length;
+
+  // While filtering, a group with nothing to match is skipped entirely —
+  // including an empty one, whose open input would be noise in the results.
+  if (activeLabel && !visible.length) return null;
+
+  if (!isEmpty && !visible.length) {
     const none = document.createElement("div");
     none.className = "empty-group";
     none.textContent = "all " + g.questions.length + " asked \u2014 nothing left here";
     sec.appendChild(none);
   }
 
-  visible.forEach(q => ol.appendChild(renderQuestion(g, q)));
+  // An insertion point sits on every separator between questions, so a new
+  // question can be added exactly where it belongs instead of at the end
+  // and then dragged. The last one appends to the group.
+  visible.forEach((q, i) => {
+    ol.appendChild(renderInsertRow(g, q.id, i === 0));
+    ol.appendChild(renderQuestion(g, q));
+  });
+  // The last insertion point appends to the group — same row, same behaviour.
+  // For an empty group it starts open, so the prompt is there immediately.
+  ol.appendChild(renderInsertRow(g, null, isEmpty, isEmpty));
   sec.appendChild(ol);
 
-  /* --- toggle row: a + in the colour-bar column; when open, the input and
-     button sit inline on the same row instead of wrapping to a new line. --- */
-  const toggle = document.createElement("div");
-  toggle.className = "add-toggle" + (openAdder === g.id ? " open" : "");
+  return sec;
+}
+
+/* One insertion point. `before` is the question it inserts above, or null to
+   append at the end of the group. `alwaysOpen` keeps an empty group's input
+   showing without needing a hover or a click. */
+function renderInsertRow(g, before, noRule, alwaysOpen) {
+  const open = alwaysOpen ||
+    (openAdder && openAdder.gid === g.id && openAdder.before === before);
+  const key = g.id + "|" + (before || "end");
+
+  const row = document.createElement("li");
+  row.className = "insert-row" + (open ? " open" : "") + (noRule ? " no-rule" : "");
 
   const plus = document.createElement("button");
-  plus.className = "plus-btn" + (openAdder === g.id ? " open" : "");
-  plus.title = openAdder === g.id ? "Hide" : "Add a question";
-  plus.setAttribute("aria-label", (openAdder === g.id ? "Hide" : "Show") + " add-question field for " + g.name);
-  plus.setAttribute("aria-expanded", openAdder === g.id ? "true" : "false");
+  plus.className = "plus-btn" + (open ? " open" : "") + (alwaysOpen ? " spacer" : "");
+  plus.title = open ? "Close" : "Add a question here";
+  plus.setAttribute("aria-label", open ? "Close add-question field" : "Add a question here in " + g.name);
+  plus.setAttribute("aria-expanded", open ? "true" : "false");
+  if (alwaysOpen) {
+    // Nothing to toggle in an empty group — keep the space, drop the control.
+    plus.disabled = true;
+    plus.setAttribute("aria-hidden", "true");
+    plus.removeAttribute("aria-expanded");
+  }
 
   const toggleAdder = e => {
     e.stopPropagation();
-    openAdder = (openAdder === g.id) ? null : g.id;
+    openAdder = open ? null : { gid: g.id, before: before };
     render();
-    if (openAdder === g.id) {
-      const fresh = document.querySelector('[data-addfor="' + g.id + '"]');
+    if (!open) {
+      const fresh = document.querySelector('[data-addfor="' + key + '"]');
       if (fresh) fresh.focus();
     }
   };
   plus.addEventListener("click", toggleAdder);
+  row.appendChild(plus);
 
-  toggle.appendChild(plus);
-
-  if (openAdder === g.id) {
+  if (open) {
     const input = document.createElement("input");
     input.type = "text";
     input.className = "pill q-input";
-    input.placeholder = "Add a question to \u201C" + g.name + "\u201D";
+    input.placeholder = before ? "Insert a question here" : "Add a question to \u201C" + g.name + "\u201D";
     input.setAttribute("aria-label", "New question in " + g.name);
-    input.dataset.addfor = g.id;
+    input.dataset.addfor = key;
 
     const btn = document.createElement("button");
     btn.className = "pill add-btn";
@@ -1283,8 +1326,8 @@ function renderGroup(g) {
     const commit = () => {
       const text = input.value;
       if (text.trim()) {
-        openAdder = null;          // collapse back to the + after adding
-        addQuestion(g.id, text);   // this re-renders in the closed state
+        openAdder = null;                    // collapse back to the + after adding
+        addQuestion(g.id, text, before);     // this re-renders in the closed state
       }
     };
     input.addEventListener("keydown", e => {
@@ -1293,18 +1336,10 @@ function renderGroup(g) {
     });
     btn.addEventListener("click", e => { e.stopPropagation(); commit(); });
 
-    toggle.append(input, btn);
-  } else {
-    const plusLabel = document.createElement("span");
-    plusLabel.className = "plus-label";
-    plusLabel.textContent = "add question";
-    plusLabel.addEventListener("click", toggleAdder);
-    toggle.appendChild(plusLabel);
+    row.append(input, btn);
   }
 
-  sec.appendChild(toggle);
-
-  return sec;
+  return row;
 }
 
 function renderQuestion(g, q) {
