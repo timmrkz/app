@@ -543,25 +543,33 @@
   .import-note.err { color: var(--signal); }
   .import-note.ok  { color: var(--thread); }
 
+  /* Narrow layout. This is about available width only — hover-dependent
+     behaviour is handled separately below, so a narrow desktop window keeps
+     its hover affordances. */
   @media (max-width: 640px) {
     .q { grid-template-columns: 0.75rem minmax(0,1fr); }
     .q .labels { grid-column: 2; }
+    /* Labels wrap onto their own row here, so the colour bar has to span
+       both rows — otherwise it stops at the question text. */
+    .q .bar { grid-row: 1 / span 2; }
     /* Add row wraps on narrow screens: input takes the line, button below. */
     .insert-row { flex-wrap: wrap; }
     .insert-row.open { height: auto; padding: 0.4rem 0; }
     .insert-row.open .q-input { flex: 1 1 100%; }
-    /* No hover on touch — keep every insertion + reachable, and hold the
-       separator retracted since the glyph is always showing. */
-    .insert-row .plus-btn { opacity: 1; }
-    .insert-row::before { left: 1.1rem; }
     /* Name and delete share one line; header is two columns now. */
     .group-head { gap: 0.55rem; }
-    /* No hover on touch — keep delete visible, and let the wider confirm
-       state wrap rather than crush the name. */
-    .group-kill { opacity: 1; pointer-events: auto; }
-    .filter-clear { opacity: 1; pointer-events: auto; }
     .group-tools { flex-wrap: wrap; justify-content: flex-end; }
     .confirm-del { flex-wrap: wrap; justify-content: flex-end; }
+  }
+
+  /* Touch devices have no hover, so anything that normally reveals on hover
+     stays visible. Keyed to the pointer, not the window width — a narrow
+     desktop window still gets the quiet hover-based behaviour. */
+  @media (hover: none) {
+    .insert-row .plus-btn { opacity: 1; }
+    .insert-row::before { left: 1.1rem; }
+    .group-kill { opacity: 1; pointer-events: auto; }
+    .filter-clear { opacity: 1; pointer-events: auto; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
