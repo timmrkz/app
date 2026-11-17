@@ -153,16 +153,23 @@
   .name-wrap:focus-within .group-kill,
   .group-kill:focus-visible { opacity: 1; pointer-events: auto; }
   .group-tools.stay .group-kill { opacity: 1; pointer-events: auto; }
-  .group-kill {
-    background: none; border: 1px solid var(--ink-soft); color: var(--muted);
-    font-size: 0.66rem; letter-spacing: 0.05em; padding: 0.2rem 0.6rem; border-radius: 20px;
+  /* Delete, and the Cancel/Delete pair that replaces it, share one size.
+     Cancel takes delete's exact spot, so a double click lands on Cancel. */
+  .group-kill, .confirm-del button {
+    width: 4.6rem; justify-content: center; display: inline-flex; align-items: center;
+    font-size: 0.66rem; letter-spacing: 0.05em; padding: 0.2rem 0; border-radius: 20px;
+    white-space: nowrap; flex: 0 0 auto;
   }
+  .group-kill { background: none; border: 1px solid var(--ink-soft); color: var(--muted); }
   .group-kill:hover { color: var(--signal); border-color: var(--signal); }
+  .group-tools { min-width: 0; }
+  .name-wrap { max-width: 100%; }
+  .name-wrap .group-count { flex-shrink: 0; }
   .confirm-del {
-    display: flex; gap: 0.35rem; align-items: center;
+    display: flex; gap: 0.35rem; align-items: center; min-width: 0;
     font-family: var(--mono); font-size: 0.66rem; color: var(--signal);
   }
-  .confirm-del button { font-size: 0.64rem; padding: 0.2rem 0.6rem; border-radius: 20px; }
+  .confirm-del span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .confirm-del .yes { background: var(--signal); color: var(--paper); border-color: var(--signal); }
   .confirm-del .no  { background: none; color: var(--muted); border-color: var(--ink-soft); }
   .confirm-del .no:hover { color: var(--ink); }
@@ -253,7 +260,7 @@
 
   /* Third column: just the delete control. Delete, and the Delete/Cancel
      pair that replaces it, share one fixed width so the column never moves. */
-  .q-actions { display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.1rem; }
+  .q-actions { display: flex; justify-content: flex-end; padding-top: 0.1rem; }
   .q-kill, .confirm-q button {
     width: 5.2rem; height: 1.65rem; justify-content: center;
     display: inline-flex; align-items: center;
@@ -272,8 +279,19 @@
   .q-actions .q-kill:focus-visible { opacity: 1; pointer-events: auto; }
   .q.asked:hover .q-actions .q-kill { opacity: 0.5; }
 
-  /* Confirm stacks Delete over Cancel inside the same column. */
-  .confirm-q { display: flex; flex-direction: column; gap: 0.35rem; }
+  /* Confirm sits on one line. Cancel takes delete's exact spot at the right
+     edge, the confirming Delete appears to its left. A double click on
+     delete therefore lands on Cancel, never on the real Delete. */
+  .confirm-q { display: flex; flex-direction: row; position: relative; gap: 0.35rem; }
+  .q.confirming .text .first-line {
+    display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .q.confirming .text .rest-lines { display: block; }
+  /* The confirming Delete floats over the end of the text line, so the
+     column keeps its width and the question text never rewraps. */
+  .confirm-q .yes {
+    position: absolute; top: 0; right: calc(100% + 0.35rem); z-index: 2;
+  }
   .confirm-q .yes { background: var(--signal); color: var(--paper); border-color: var(--signal); }
   .confirm-q .no  { background: none; color: var(--muted); border-color: var(--ink-soft); }
   .confirm-q .no:hover { color: var(--ink); }
@@ -494,8 +512,6 @@
     .insert-row.open .q-input { flex: 1 1 100%; }
     /* Name and delete share one line; header is two columns now. */
     .group-head { gap: 0.55rem; }
-    .group-tools { flex-wrap: wrap; justify-content: flex-end; }
-    .confirm-del { flex-wrap: wrap; justify-content: flex-end; }
   }
 
   /* Touch devices have no hover, so anything that normally reveals on hover
@@ -1109,6 +1125,47 @@ function render() {
   renderExport();
   renderSavebar();
   if (typeof syncSessionButtons === "function") syncSessionButtons();
+  document.querySelectorAll(".q.confirming .text").forEach(clipFirstLine);
+}
+
+/* While a question's delete is armed, the confirming Delete floats over the
+   end of its first line. That line gets cut with an ellipsis one button gap
+   before Delete. Lines below keep their wrapping, so the row never moves. */
+function clipFirstLine(el) {
+  const node = el.firstChild;
+  if (!node || node.nodeType !== Node.TEXT_NODE) return;
+  const yes = el.closest(".q").querySelector(".confirm-q .yes");
+  if (!yes) return;
+
+  // Find where the second line starts.
+  const str = node.textContent;
+  const range = document.createRange();
+  let firstTop = null, breakAt = str.length;
+  for (let i = 0; i < str.length; i++) {
+    range.setStart(node, i); range.setEnd(node, i + 1);
+    const r = range.getClientRects()[0];
+    if (!r || !r.width) continue;
+    if (firstTop === null) { firstTop = r.top; continue; }
+    if (r.top > firstTop + 2) { breakAt = i; break; }
+  }
+
+  const first = document.createElement("span");
+  first.className = "first-line";
+  first.textContent = str.slice(0, breakAt).trimEnd();
+  el.textContent = "";
+  el.appendChild(first);
+  if (breakAt < str.length) {
+    const rest = document.createElement("span");
+    rest.className = "rest-lines";
+    rest.textContent = str.slice(breakAt);
+    el.appendChild(rest);
+  }
+
+  // Stop the line one button gap short of Delete.
+  const gap = parseFloat(getComputedStyle(yes.parentElement).columnGap) ||
+              0.35 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const cut = el.getBoundingClientRect().right - (yes.getBoundingClientRect().left - gap);
+  first.style.paddingRight = Math.max(0, cut) + "px";
 }
 
 function renderGroup(g) {
@@ -1192,15 +1249,20 @@ function renderGroup(g) {
     box.className = "confirm-del";
     box.addEventListener("click", e => e.stopPropagation());
     const q = g.questions.length;
-    const txt = document.createElement("span");
-    txt.textContent = q ? "Delete group and " + q + " question" + (q === 1 ? "" : "s") + "?" : "Delete this group?";
-    const yes = document.createElement("button");
-    yes.className = "yes"; yes.textContent = "Delete";
-    yes.addEventListener("click", () => removeGroup(g.id));
+    // Cancel first, so it sits exactly where delete was. Delete follows it.
     const no = document.createElement("button");
     no.className = "no"; no.textContent = "Cancel";
     no.addEventListener("click", () => { pendingDelete = null; render(); });
-    box.append(txt, yes, no);
+    const yes = document.createElement("button");
+    yes.className = "yes"; yes.textContent = "Delete";
+    yes.addEventListener("click", () => removeGroup(g.id));
+    box.append(no, yes);
+    if (q) {
+      const txt = document.createElement("span");
+      txt.textContent = q + " question" + (q === 1 ? "" : "s") + " too";
+      txt.title = "Deletes the group and its " + q + " question" + (q === 1 ? "" : "s");
+      box.append(txt);
+    }
     tools.appendChild(box);
     tools.classList.add("stay");
   } else {
@@ -1320,7 +1382,7 @@ function renderInsertRow(g, before, noRule, alwaysOpen) {
 
 function renderQuestion(g, q) {
   const li = document.createElement("li");
-  li.className = "q" + (q.asked ? " asked" : "");
+  li.className = "q" + (q.asked ? " asked" : "") + (pendingDeleteQ === q.id ? " confirming" : "");
   li.dataset.qid = q.id;
   li.dataset.gid = g.id;
 
